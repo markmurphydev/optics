@@ -1,24 +1,33 @@
 use std::marker::PhantomData;
 
-pub trait Iso<R, U, S, T> {}
-
-impl<I, R, U, S, T> Lens<R, U, S, T> for I
+pub trait Iso<R, U, S, T>
 where
-    I: Iso<R, U, S, T>,
+    R: Clone,
+    U: Clone,
+    S: Clone,
+    T: Clone,
 {
-    fn view<'a>(&'a self, structure: &'a R) -> &'a S {
-        todo!()
-    }
-
-    fn update(self, new_focus: T, old_structure: &R) -> U {
-        todo!()
-    }
+    fn view(&self, left: &R) -> S;
+    fn review(&self, right: &T) -> U;
 }
 
-pub trait Lens<R, U, S, T>: Sized {
-    fn view<'a>(&'a self, structure: &'a R) -> &'a S;
+// impl<I, R: Clone, U: Clone, S: Clone, T: Clone> Lens<R, U, S, T> for I
+// where
+//     I: Iso<R, U, S, T>,
+// {
+//     fn view(&self, structure: &R) -> S {
+//         self.view(structure)
+//     }
+//
+//     fn update(self, new_focus: T, _old_structure: &R) -> U {
+//         self.review(&new_focus)
+//     }
+// }
+
+pub trait Lens<R: Clone, U: Clone, S: Clone, T: Clone>: Sized {
+    fn view(&self, structure: &R) -> S;
     fn update(self, new_focus: T, old_structure: &R) -> U;
-    fn with<Inner, A, B>(self, inner: Inner) -> Composed<Self, Inner, S, T>
+    fn with<Inner, A: Clone, B: Clone>(self, inner: Inner) -> Composed<Self, Inner, S, T>
     where
         Inner: Lens<S, T, A, B>,
     {
@@ -38,16 +47,36 @@ pub struct Composed<Outer, Inner, S, T> {
     t: PhantomData<T>,
 }
 
-// impl<outer, inner, r, u, s, t, a, b> lens<r, u, a, b> for composed<outer, inner, s, t>
+impl<Outer, Inner, R, U, S, T, A, B> Iso<R, U, A, B> for Composed<Outer, Inner, S, T>
+where
+    Outer: Iso<R, U, S, T>,
+    Inner: Iso<S, T, A, B>,
+    R: Clone,
+    U: Clone,
+    S: Clone,
+    T: Clone,
+    A: Clone,
+    B: Clone,
+{
+    fn view(&self, left: &R) -> A {
+        todo!()
+    }
+
+    fn review(&self, right: &B) -> U {
+        todo!()
+    }
+}
+
+// impl<Outer, Inner, R, U, S, T, A, B> Lens<R, U, A, B> for Composed<Outer, Inner, S, T>
 // where
-//     outer: lens<r, u, s, t>,
-//     inner: lens<s, t, a, b>,
+//     Outer: Lens<R, U, S, T>,
+//     Inner: Lens<S, T, A, B>,
 // {
-//     fn view<'a>(&'a self, structure: &'a r) -> &'a a {
+//     fn view<'a>(&'a self, structure: &'a R) -> &'a A {
 //         self.inner.view(self.outer.view(structure))
 //     }
 //
-//     fn update(self, new_focus: b, old_structure: &r) -> u {
+//     fn update(self, new_focus: B, old_structure: &R) -> U {
 //         let old_inner = self.outer.view(old_structure);
 //         let new_inner = self.inner.update(new_focus, old_inner);
 //         self.outer.update(new_inner, old_structure)

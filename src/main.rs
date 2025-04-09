@@ -155,9 +155,9 @@ fn main() {
 
     let armada = Armada { ship_1, ship_2 };
 
-    let ship_1_captain = armada::Ship1.with(ship::Captain);
-    dbg!(ship_1_captain.view(&armada));
-    dbg!(ship_1_captain.update("Kristen".to_string(), &armada));
+    // let ship_1_captain = armada::Ship1.with(ship::Captain);
+    // dbg!(ship_1_captain.view(&armada));
+    // dbg!(ship_1_captain.update("Kristen".to_string(), &armada));
 }
 
 // ==== Example ====
@@ -171,19 +171,19 @@ pub mod ship {
     use crate::Ship;
     use crate::concrete_impl::*;
 
-    pub struct Captain;
-    impl Lens<Ship, Ship, String, String> for Captain {
-        fn view<'a>(&'a self, ship: &'a Ship) -> &'a String {
-            &ship.captain
-        }
-
-        fn update(self, new_captain: String, old_ship: &Ship) -> Ship {
-            Ship {
-                captain: new_captain,
-                ..old_ship.clone()
-            }
-        }
-    }
+    // pub struct Captain;
+    // impl Lens<Ship, Ship, String, String> for Captain {
+    //     fn view<'a>(&'a self, ship: &'a Ship) -> &'a String {
+    //         &ship.captain
+    //     }
+    //
+    //     fn update(self, new_captain: String, old_ship: &Ship) -> Ship {
+    //         Ship {
+    //             captain: new_captain,
+    //             ..old_ship.clone()
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Clone, Debug)]
@@ -197,16 +197,16 @@ pub mod armada {
     use crate::{Armada, Ship};
 
     pub struct Ship1;
-    impl Lens<Armada, Armada, Ship, Ship> for Ship1 {
-        fn view<'a>(&'a self, armada: &'a Armada) -> &'a Ship {
-            &armada.ship_1
-        }
-
-        fn update(self, new_ship_1: Ship, old_armada: &Armada) -> Armada {
-            Armada {
-                ship_1: new_ship_1,
-                ..old_armada.clone()
-            }
-        }
-    }
+    // impl Lens<Armada, Armada, Ship, Ship> for Ship1 {
+    //     fn view<'a>(&'a self, armada: &'a Armada) -> &'a Ship {
+    //         &armada.ship_1
+    //     }
+    //
+    //     fn update(self, new_ship_1: Ship, old_armada: &Armada) -> Armada {
+    //         Armada {
+    //             ship_1: new_ship_1,
+    //             ..old_armada.clone()
+    //         }
+    //     }
+    // }
 }
