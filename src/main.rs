@@ -1,6 +1,8 @@
 mod animals;
+mod choose_optic;
 mod concrete_impl;
 mod families;
+mod hkt;
 
 use crate::concrete_impl::Lens;
 use std::marker::PhantomData;

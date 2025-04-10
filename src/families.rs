@@ -1,45 +1,59 @@
-struct OpticsMin;
-trait Min<Rhs> {
-    type Result;
+use std::marker::PhantomData;
+
+trait OpticsMin {
+    type Min<Rhs: OpticsMin>;
+    type MinIso;
+    type MinLens;
+    type MinOptic;
 }
 
-impl Min<OpticsIso> for OpticsIso {
-    type Result = OpticsIso;
+impl OpticsMin for IsoKind {
+    type Min<Rhs: OpticsMin> = Rhs::MinIso;
+    type MinIso = IsoKind;
+    type MinLens = LensKind;
+    type MinOptic = OpticKind;
 }
 
-impl Min<OpticsLens> for OpticsIso {
-    type Result = OpticsIso;
+impl OpticsMin for LensKind {
+    type Min<Rhs: OpticsMin> = Rhs::MinLens;
+    type MinIso = LensKind;
+    type MinLens = LensKind;
+    type MinOptic = OpticKind;
 }
 
-impl Min<OpticsIso> for OpticsLens {
-    type Result = OpticsIso;
+impl OpticsMin for OpticKind {
+    type Min<Rhs: OpticsMin> = Rhs::MinOptic;
+    type MinIso = OpticKind;
+    type MinLens = OpticKind;
+    type MinOptic = OpticKind;
 }
 
-impl Min<OpticsLens> for OpticsLens {
-    type Result = OpticsLens;
-}
-
-trait OpticsKind {}
-struct OpticsIso;
-impl OpticsKind for OpticsIso {}
-struct OpticsLens;
-impl OpticsKind for OpticsLens {}
+struct IsoKind;
+struct LensKind;
+struct OpticKind;
 
 trait Iso: Lens {
-    type OpticsKind;
+    type OpticsKind: OpticsMin;
     fn from(&self, a: u32) -> u32;
 }
 
 trait Lens: Optic {
-    type OpticsKind;
+    type OpticsKind: OpticsMin;
     fn view(&self, a: u32) -> u32;
 }
 
 trait Optic: Sized {
-    type OpticsKind;
+    type OpticsKind: OpticsMin;
     fn with<Inner: Optic>(
+        self,
         inner: Inner,
-    ) -> Composed<Inner, Self, Inner::OpticsKind, Self::OpticsKind>;
+    ) -> Composed<Inner, Self, <Self::OpticsKind as OpticsMin>::Min<Inner::OpticsKind>> {
+        Composed {
+            inner,
+            outer: self,
+            kind: PhantomData,
+        }
+    }
 }
 
 impl<I> Lens for I
@@ -59,62 +73,37 @@ where
 {
     type OpticsKind = <L as Lens>::OpticsKind;
 
-    fn with<Inner: Optic>(
-        inner: Inner,
-    ) -> Composed<Inner, Self, Inner::OpticsKind, Self::OpticsKind> {
-        todo!()
-    }
+    // fn with<Inner: Optic>(
+    //     inner: Inner,
+    // ) -> Composed<Inner, Self, Inner::OpticsKind, Self::OpticsKind> {
+    //     todo!()
+    // }
 }
 
-struct Composed<Inner, Outer, InnerFamily, OuterFamily> {
+struct Composed<Inner, Outer, OpticsKind> {
     inner: Inner,
-    inner_family: InnerFamily,
     outer: Outer,
-    outer_family: OuterFamily,
+    kind: PhantomData<OpticsKind>,
 }
 
-impl<I, O> Iso for Composed<I, O, OpticsIso, OpticsIso>
+impl<I, O> Iso for Composed<I, O, IsoKind>
 where
     I: Iso,
     O: Iso,
 {
-    type OpticsKind = OpticsIso;
+    type OpticsKind = IsoKind;
 
     fn from(&self, a: u32) -> u32 {
         a + 1
     }
 }
 
-impl<I, O> Iso for Composed<I, O, OpticsLens, OpticsIso>
-where
-    I: Iso,
-    O: Iso,
-{
-    type OpticsKind = OpticsIso;
-
-    fn from(&self, a: u32) -> u32 {
-        a + 1
-    }
-}
-
-impl<I, O> Iso for Composed<I, O, OpticsIso, OpticsLens>
-where
-    I: Iso,
-    O: Iso,
-{
-    type OpticsKind = OpticsIso;
-
-    fn from(&self, a: u32) -> u32 {
-        a + 1
-    }
-}
-
-impl<I, O> Lens for Composed<I, O, OpticsLens, OpticsLens>
+impl<I, O> Lens for Composed<I, O, LensKind>
 where
     I: Lens,
     O: Lens,
 {
-    type OpticsKind = OpticsLens;
+    type OpticsKind = LensKind;
 
     fn view(&self, a: u32) -> u32 {
         todo!()
