@@ -1,3 +1,4 @@
+use std::convert;
 use std::marker::PhantomData;
 
 // ==== Class Hierarchy ====
@@ -62,38 +63,48 @@ trait Profunctor<B, C> {
         Post: Fn(C) -> D;
 }
 
-// Example impl
-trait FnProfunctor<B, C> {
-    fn run(&self, b: B) -> C;
-}
+// ==== Reified Function ====
+// To implement Profunctor.
+
+// struct Function<F, A, B> {
+//     f: F,
+//     a: PhantomData<A>,
+//     b: PhantomData<B>,
+// }
+//
+// impl<F, A, B> Function<F, A, B> {
+//     pub fn new(f: F) -> Self {
+//         Function {
+//             f,
+//             a: Default::default(),
+//             b: Default::default(),
+//         }
+//     }
+// }
+//
+// impl<F, A, B> Function<F, A, B>
+// where
+//     F: Fn(A) -> B,
+// {
+//     pub fn run(&self, a: A) -> B {
+//         (self.f)(a)
+//     }
+// }
 
 impl<F, B, C> Profunctor<B, C> for F
 where
-    F: FnProfunctor<B, C>,
+    F: Fn(B) -> C,
 {
     fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
     where
         Pre: Fn(A) -> B,
         Post: Fn(C) -> D,
     {
-        Dimap {
-            pre,
-            f: self,
-            post,
-            a: PhantomData,
-            b: PhantomData,
-            c: PhantomData,
-            d: PhantomData,
-        }
+        Dimap::new(pre, self, post)
     }
 }
 
-struct Dimap<Pre, F, Post, A, B, C, D>
-where
-    Pre: Fn(A) -> B,
-    F: FnProfunctor<B, C>,
-    Post: Fn(C) -> D,
-{
+struct Dimap<Pre, F, Post, A, B, C, D> {
     pre: Pre,
     f: F,
     post: Post,
@@ -102,15 +113,36 @@ where
     c: PhantomData<C>,
     d: PhantomData<D>,
 }
+impl<Pre, F, Post, A, B, C, D> Dimap<Pre, F, Post, A, B, C, D> {
+    pub fn new(pre: Pre, f: F, post: Post) -> Self {
+        Dimap {
+            pre,
+            f,
+            post,
+            a: Default::default(),
+            b: Default::default(),
+            c: Default::default(),
+            d: Default::default(),
+        }
+    }
+}
 
-impl<Pre, F, Post, A, B, C, D> FnProfunctor<A, D> for Dimap<Pre, F, Post, A, B, C, D>
+impl<Pre, F, Post, A, B, C, D> Profunctor<A, D> for Dimap<Pre, F, Post, A, B, C, D>
 where
     Pre: Fn(A) -> B,
-    F: FnProfunctor<B, C>,
+    F: Profunctor<B, C>,
     Post: Fn(C) -> D,
 {
-    fn run(&self, a: A) -> D {
-        (self.post)(self.f.run((self.pre)(a)))
+    fn dimap<OuterPre, OuterPost, X, Y>(
+        self,
+        pre: OuterPre,
+        post: OuterPost,
+    ) -> impl Profunctor<X, Y>
+    where
+        OuterPre: Fn(X) -> A,
+        OuterPost: Fn(D) -> Y,
+    {
+        Dimap::new(pre, self, post)
     }
 }
 
@@ -138,7 +170,8 @@ where
     C: OpticClass,
 {
     fn view(&self, structure: R) -> S {
-        self.transform()
+        let concrete = Adapter::new(convert::identity, convert::identity);
+        let concrete = self.transform(concrete);
         todo!()
     }
 }
@@ -173,11 +206,7 @@ struct WithOptic<Outer, Inner, S, T> {
 
 // ==== Introduction ====
 
-struct Adapter<View, Review, R, U, S, T>
-where
-    View: Fn(R) -> S,
-    Review: Fn(T) -> U,
-{
+struct Adapter<View, Review, R, U, S, T> {
     view: View,
     review: Review,
     r: PhantomData<R>,
@@ -186,11 +215,7 @@ where
     t: PhantomData<T>,
 }
 
-impl<View, Review, R, U, S, T> Adapter<View, Review, R, U, S, T>
-where
-    View: Fn(R) -> S,
-    Review: Fn(T) -> U,
-{
+impl<View, Review, R, U, S, T> Adapter<View, Review, R, U, S, T> {
     pub fn new(view: View, review: Review) -> Self {
         Adapter {
             view,
@@ -200,6 +225,20 @@ where
             s: Default::default(),
             t: Default::default(),
         }
+    }
+}
+
+impl<View, Review, R, U, S, T> Profunctor<R, U> for Adapter<View, Review, R, U, S, T>
+where
+    View: Fn(R) -> S,
+    Review: Fn(T) -> U,
+{
+    fn dimap<Pre, Post, X, Y>(self, pre: Pre, post: Post) -> impl Profunctor<X, Y>
+    where
+        Pre: Fn(X) -> R,
+        Post: Fn(U) -> Y,
+    {
+        Adapter::new(|x: X| (self.view)(pre(x)), |t: T| post((self.review)(t)))
     }
 }
 
@@ -224,18 +263,15 @@ mod test {
             x + 1
         }
 
+        fn add2(x: u32) -> u32 {
+            x + 2
+        }
+
         fn add3(x: u32) -> u32 {
             x + 3
         }
 
-        struct Add2;
-        impl FnProfunctor<u32, u32> for Add2 {
-            fn run(&self, b: u32) -> u32 {
-                b + 2
-            }
-        }
-
-        let add6 = Add2.dimap(add1, add3);
+        let add6 = Function::new(add2).dimap(add1, add3);
 
         let adapter = Adapter::new(add1, add3);
         // println!("add6: {}", add6.run(0))
