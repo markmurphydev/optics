@@ -1,5 +1,39 @@
 use std::marker::PhantomData;
 
+trait OpticKind {
+    type With<Rhs: OpticKind>;
+    type WithIso;
+    type WithLens;
+    type WithOptic;
+}
+
+impl OpticKind for IsIso {
+    type With<Rhs: OpticKind> = Rhs::WithIso;
+    type WithIso = IsIso;
+    type WithLens = IsLens;
+    type WithOptic = IsOptic;
+}
+
+impl OpticKind for IsLens {
+    type With<Rhs: OpticKind> = Rhs::WithLens;
+    type WithIso = IsLens;
+    type WithLens = IsLens;
+    type WithOptic = IsOptic;
+}
+
+impl OpticKind for IsOptic {
+    type With<Rhs: OpticKind> = Rhs::WithOptic;
+    type WithIso = IsOptic;
+    type WithLens = IsOptic;
+    type WithOptic = IsOptic;
+}
+
+struct IsIso;
+struct IsLens;
+struct IsOptic;
+
+// TODO -- Are the trait bounds needed?
+// TODO -- Multiple inheritance (Lens / Prism) -> Traverse/Optic
 pub trait Iso<R, U, S, T>
 where
     R: Clone,
@@ -7,44 +41,80 @@ where
     S: Clone,
     T: Clone,
 {
+    type OpticKind: OpticKind;
     fn view(&self, left: &R) -> S;
     fn review(&self, right: &T) -> U;
 }
 
-// impl<I, R: Clone, U: Clone, S: Clone, T: Clone> Lens<R, U, S, T> for I
-// where
-//     I: Iso<R, U, S, T>,
-// {
-//     fn view(&self, structure: &R) -> S {
-//         self.view(structure)
-//     }
-//
-//     fn update(self, new_focus: T, _old_structure: &R) -> U {
-//         self.review(&new_focus)
-//     }
-// }
+impl<I, R, U, S, T> Lens<R, U, S, T> for I
+where
+    I: Iso<R, U, S, T>,
+    R: Clone,
+    U: Clone,
+    S: Clone,
+    T: Clone,
+{
+    type OpticKind = <I as Iso<R, U, S, T>>::OpticKind;
 
-pub trait Lens<R: Clone, U: Clone, S: Clone, T: Clone>: Sized {
+    fn view(&self, structure: &R) -> S {
+        self.view(structure)
+    }
+
+    // We can recover the entire structure from `new_focus`,
+    // so we can discard `old_structure`
+    fn update(self, new_focus: T, _old_structure: &R) -> U {
+        self.review(&new_focus)
+    }
+}
+
+pub trait Lens<R, U, S, T>
+where
+    R: Clone,
+    U: Clone,
+    S: Clone,
+    T: Clone,
+{
+    type OpticKind: OpticKind;
+
     fn view(&self, structure: &R) -> S;
     fn update(self, new_focus: T, old_structure: &R) -> U;
-    fn with<Inner, A: Clone, B: Clone>(self, inner: Inner) -> Composed<Self, Inner, S, T>
+}
+
+impl<L, R, U, S, T> Optic<R, U, S, T> for L
+where
+    L: Iso<R, U, S, T>,
+    R: Clone,
+    U: Clone,
+    S: Clone,
+    T: Clone,
+{
+    type OpticKind = <L as Lens<R, U, S, T>>::OpticKind;
+}
+
+pub trait Optic<R, U, S, T>: Sized {
+    type OpticKind: OpticKind;
+
+    fn with<Inner, A, B>(
+        self,
+        inner: Inner,
+    ) -> Composed<Self, Inner, <Self::OpticKind as OpticKind>::With<Inner::OpticKind>>
     where
-        Inner: Lens<S, T, A, B>,
+        Inner: Optic<S, T, A, B>,
+        A: Clone,
+        B: Clone,
     {
         Composed {
             outer: self,
             inner,
-            s: PhantomData,
-            t: PhantomData,
+            composed_kind: PhantomData,
         }
     }
 }
 
-pub struct Composed<Outer, Inner, S, T> {
+pub struct Composed<Outer, Inner, ComposedKind> {
     outer: Outer,
     inner: Inner,
-    s: PhantomData<S>,
-    t: PhantomData<T>,
+    composed_kind: PhantomData<ComposedKind>,
 }
 
 impl<Outer, Inner, R, U, S, T, A, B> Iso<R, U, A, B> for Composed<Outer, Inner, S, T>
@@ -58,6 +128,8 @@ where
     A: Clone,
     B: Clone,
 {
+    type OpticKind = ();
+
     fn view(&self, left: &R) -> A {
         todo!()
     }

@@ -72,12 +72,6 @@ where
     L: Lens,
 {
     type OpticsKind = <L as Lens>::OpticsKind;
-
-    // fn with<Inner: Optic>(
-    //     inner: Inner,
-    // ) -> Composed<Inner, Self, Inner::OpticsKind, Self::OpticsKind> {
-    //     todo!()
-    // }
 }
 
 struct Composed<Inner, Outer, OpticsKind> {
