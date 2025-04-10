@@ -1,5 +1,9 @@
 use std::marker::PhantomData;
 
+trait ProfunctorFamily {
+    type Profunctor<B, C>: Profunctor<B, C>;
+}
+
 trait Profunctor<B, C> {
     fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
     where
@@ -59,44 +63,70 @@ where
     }
 }
 
-// ==== Trying functors ====
-// trait Functor<A> {
-//     type With<F, B>: Functor<B>
-//     where
-//         F: Fn(A) -> B;
-//
-//     fn map<F, B>(self, f: F) -> Self::With<F, B>
-//     where
-//         F: Fn(A) -> B;
+// trait Optic<K, R, U, S, T>: Sized {
+//     
 // }
-//
-// impl<A> Functor<A> for Option<A> {
-//     type With<F, B>
-//     where
-//         F: Fn(A) -> B,
-//     = Option<B>;
-//
-//     fn map<F, B>(self, f: F) -> Self::With<F, B>
-//     where
-//         F: Fn(A) -> B,
-//     {
-//         Option::map(self, f)
-//     }
-// }
-//
-// impl<A, E> Functor<A> for Result<A, E> {
-//     type With<F, B>
-//     where
-//         F: Fn(A) -> B,
-//     = Result<B, E>;
-//
-//     fn map<F, B>(self, f: F) -> Self::With<F, B>
-//     where
-//         F: Fn(A) -> B,
-//     {
-//         self.map(f)
-//     }
-// }
+// 
+// impl <K, F, R, U, S, T> OpticP<K, F, R, U>
+
+// Self: * -> * -> *
+trait OpticP<F, R, U, S, T>: Sized
+where
+    F: ProfunctorFamily,
+{
+    fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U>;
+
+    // with : (p s t -> p r u) -> (p a b -> p s t) -> (p a b) -> (p r u)
+    // Don't be deceived by the <S, T> in `WithOptic`. It's just phantomdata for the intermediates
+    fn with<Inner, A, B>(self, inner: Inner) -> WithOptic<Self, Inner, S, T> {
+        WithOptic {
+            outer: self,
+            inner,
+            s: Default::default(),
+            t: Default::default(),
+        }
+    }
+}
+
+trait AdapterP<F, R, U, S, T>: OpticP<F, R, U, S, T>
+where
+    F: ProfunctorFamily,
+{
+}
+
+struct Adapter<View, Review, R, U, S, T>
+where
+    View: Fn(R) -> S,
+    Review: Fn(T) -> U,
+{
+    view: View,
+    review: Review,
+    r: PhantomData<R>,
+    u: PhantomData<U>,
+    s: PhantomData<S>,
+    t: PhantomData<T>,
+}
+
+impl<F, View, Review, R, U, S, T> OpticP<F, R, U, S, T> for Adapter<View, Review, R, U, S, T>
+where
+    F: ProfunctorFamily,
+    View: Fn(R) -> S,
+    Review: Fn(T) -> U,
+{
+    fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U> {
+        pro.dimap(self.view, self.review)
+    }
+}
+
+struct WithOptic<Outer, Inner, S, T> {
+    // kind: PhantomData<Kind>,
+    outer: Outer,
+    inner: Inner,
+    s: PhantomData<S>,
+    t: PhantomData<T>,
+}
+
+// ==== Introduction ====
 
 #[cfg(test)]
 mod test {
@@ -121,6 +151,6 @@ mod test {
         }
 
         let add6 = Add2.dimap(add1, add3);
-        println!("add6: {}", add6.run(0))
+        // println!("add6: {}", add6.run(0))
     }
 }
