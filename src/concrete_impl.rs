@@ -117,27 +117,27 @@ pub struct Composed<Outer, Inner, ComposedKind> {
     composed_kind: PhantomData<ComposedKind>,
 }
 
-impl<Outer, Inner, R, U, S, T, A, B> Iso<R, U, A, B> for Composed<Outer, Inner, S, T>
-where
-    Outer: Iso<R, U, S, T>,
-    Inner: Iso<S, T, A, B>,
-    R: Clone,
-    U: Clone,
-    S: Clone,
-    T: Clone,
-    A: Clone,
-    B: Clone,
-{
-    type OpticKind = ();
-
-    fn view(&self, left: &R) -> A {
-        todo!()
-    }
-
-    fn review(&self, right: &B) -> U {
-        todo!()
-    }
-}
+// impl<Outer, Inner, R, U, S, T, A, B> Iso<R, U, A, B> for Composed<Outer, Inner, S, T>
+// where
+//     Outer: Iso<R, U, S, T>,
+//     Inner: Iso<S, T, A, B>,
+//     R: Clone,
+//     U: Clone,
+//     S: Clone,
+//     T: Clone,
+//     A: Clone,
+//     B: Clone,
+// {
+//     type OpticKind = ();
+//
+//     fn view(&self, left: &R) -> A {
+//         todo!()
+//     }
+//
+//     fn review(&self, right: &B) -> U {
+//         todo!()
+//     }
+// }
 
 // impl<Outer, Inner, R, U, S, T, A, B> Lens<R, U, A, B> for Composed<Outer, Inner, S, T>
 // where
