@@ -1,4 +1,6 @@
+mod animals;
 mod concrete_impl;
+mod families;
 
 use crate::concrete_impl::Lens;
 use std::marker::PhantomData;
