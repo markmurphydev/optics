@@ -1,5 +1,56 @@
 use std::marker::PhantomData;
 
+// ==== Class Hierarchy ====
+// For calculating least upper bound of two optics kinds
+
+struct IsOptic;
+struct IsLens;
+struct IsPrism;
+struct IsAdapter;
+
+trait OpticClass {
+    type With<Rhs: OpticClass>;
+    type WithOptic;
+    type WithLens;
+    type WithPrism;
+    type WithAdapter;
+}
+
+impl OpticClass for IsOptic {
+    type With<Rhs: OpticClass> = Rhs::WithOptic;
+    type WithOptic = IsOptic;
+    type WithLens = IsOptic;
+    type WithPrism = IsOptic;
+    type WithAdapter = IsOptic;
+}
+
+impl OpticClass for IsLens {
+    type With<Rhs: OpticClass> = Rhs::WithLens;
+    type WithOptic = IsOptic;
+    type WithLens = IsLens;
+    type WithPrism = IsOptic;
+    type WithAdapter = IsLens;
+}
+
+impl OpticClass for IsPrism {
+    type With<Rhs: OpticClass> = Rhs::WithPrism;
+    type WithOptic = IsOptic;
+    type WithLens = IsOptic;
+    type WithPrism = IsPrism;
+    type WithAdapter = IsPrism;
+}
+
+impl OpticClass for IsAdapter {
+    type With<Rhs: OpticClass> = Rhs::WithAdapter;
+    type WithOptic = IsOptic;
+    type WithLens = IsLens;
+    type WithPrism = IsPrism;
+    type WithAdapter = IsAdapter;
+}
+
+// ==== Families ====
+// For emulating higher-kinded types
+
 trait ProfunctorFamily {
     type Profunctor<B, C>: Profunctor<B, C>;
 }
@@ -63,18 +114,11 @@ where
     }
 }
 
-// trait Optic<K, R, U, S, T>: Sized {
-//     
-// }
-// 
-// impl <K, F, R, U, S, T> OpticP<K, F, R, U>
-
-// Self: * -> * -> *
-trait OpticP<F, R, U, S, T>: Sized
+trait Optic<C, R, U, S, T>: Sized
 where
-    F: ProfunctorFamily,
+    C: OpticClass,
 {
-    fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U>;
+    fn transform(self, pro: impl Profunctor<S, T>) -> impl Profunctor<R, U>;
 
     // with : (p s t -> p r u) -> (p a b -> p s t) -> (p a b) -> (p r u)
     // Don't be deceived by the <S, T> in `WithOptic`. It's just phantomdata for the intermediates
@@ -88,11 +132,46 @@ where
     }
 }
 
-trait AdapterP<F, R, U, S, T>: OpticP<F, R, U, S, T>
+// TODO -- move this to another module
+trait TAdapter<C, R, U, S, T>: Optic<C, R, U, S, T>
 where
-    F: ProfunctorFamily,
+    C: OpticClass,
 {
+    fn view(&self, structure: R) -> S {
+        self.transform()
+        todo!()
+    }
 }
+
+// impl<O, C, F, R, U, S, T> OpticP<C, F, R, U, S, T> for O
+// where
+//     F: ProfunctorFamily,
+//     O: Optic<C, R, U, S, T>,
+// {
+//     fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U> {
+//
+//     }
+// }
+
+// Self: * -> * -> *
+// trait OpticP<C, F, R, U, S, T>: Sized
+// where
+//     C: OpticClass,
+//     F: ProfunctorFamily,
+// {
+//     fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U>;
+//
+// }
+
+struct WithOptic<Outer, Inner, S, T> {
+    // kind: PhantomData<Kind>,
+    outer: Outer,
+    inner: Inner,
+    s: PhantomData<S>,
+    t: PhantomData<T>,
+}
+
+// ==== Introduction ====
 
 struct Adapter<View, Review, R, U, S, T>
 where
@@ -107,26 +186,32 @@ where
     t: PhantomData<T>,
 }
 
-impl<F, View, Review, R, U, S, T> OpticP<F, R, U, S, T> for Adapter<View, Review, R, U, S, T>
+impl<View, Review, R, U, S, T> Adapter<View, Review, R, U, S, T>
 where
-    F: ProfunctorFamily,
     View: Fn(R) -> S,
     Review: Fn(T) -> U,
 {
-    fn transform(self, pro: F::Profunctor<S, T>) -> impl Profunctor<R, U> {
-        pro.dimap(self.view, self.review)
+    pub fn new(view: View, review: Review) -> Self {
+        Adapter {
+            view,
+            review,
+            r: Default::default(),
+            u: Default::default(),
+            s: Default::default(),
+            t: Default::default(),
+        }
     }
 }
 
-struct WithOptic<Outer, Inner, S, T> {
-    // kind: PhantomData<Kind>,
-    outer: Outer,
-    inner: Inner,
-    s: PhantomData<S>,
-    t: PhantomData<T>,
+impl<View, Review, R, U, S, T> Optic<IsAdapter, R, U, S, T> for Adapter<View, Review, R, U, S, T>
+where
+    View: Fn(R) -> S,
+    Review: Fn(T) -> U,
+{
+    fn transform(self, pro: impl Profunctor<S, T>) -> impl Profunctor<R, U> {
+        pro.dimap(self.view, self.review)
+    }
 }
-
-// ==== Introduction ====
 
 #[cfg(test)]
 mod test {
@@ -151,6 +236,8 @@ mod test {
         }
 
         let add6 = Add2.dimap(add1, add3);
+
+        let adapter = Adapter::new(add1, add3);
         // println!("add6: {}", add6.run(0))
     }
 }
