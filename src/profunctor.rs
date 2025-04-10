@@ -53,54 +53,115 @@ impl OpticClass for IsAdapter {
 // For emulating higher-kinded types
 
 trait ProfunctorFamily {
-    type Profunctor<B, C>: Profunctor<B, C>;
+    type Pro<'p, F, X, Y>: Profunctor<'p, X, Y>
+    where
+        F: Fn(X) -> Y + 'p,
+        X: 'p,
+        Y: 'p;
 }
 
-trait Profunctor<B, C> {
-    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
+trait Profunctor<'p, X, Y> {
+    type Family: ProfunctorFamily;
+
+    fn dimap<Pre, Post, W, Z>(
+        self,
+        pre: Pre,
+        post: Post,
+    ) -> <Self::Family as ProfunctorFamily>::Pro<'p, impl Fn(W) -> Z + 'p, W, Z>
     where
-        Pre: Fn(A) -> B,
-        Post: Fn(C) -> D;
+        Pre: Fn(W) -> X + 'p,
+        Post: Fn(Y) -> Z + 'p,
+        W: 'p,
+        Z: 'p;
 }
 
 // ==== Reified Function ====
-// To implement Profunctor.
+// Gives us something to return
 
-// struct Function<F, A, B> {
+struct FunctionProfunctorFamily;
+impl ProfunctorFamily for FunctionProfunctorFamily {
+    type Pro<'p, F, X, Y>
+        = Function<F, X, Y>
+    where
+        F: Fn(X) -> Y + 'p,
+        X: 'p,
+        Y: 'p;
+}
+
+// struct Function<F, X, Y> {
 //     f: F,
-//     a: PhantomData<A>,
-//     b: PhantomData<B>,
+//     _xy: PhantomData<(X, Y)>,
 // }
-//
-// impl<F, A, B> Function<F, A, B> {
+// 
+// impl<F, X, Y> Function<F, X, Y> {
 //     pub fn new(f: F) -> Self {
 //         Function {
 //             f,
-//             a: Default::default(),
-//             b: Default::default(),
+//             _xy: Default::default(),
 //         }
 //     }
 // }
-//
-// impl<F, A, B> Function<F, A, B>
+// 
+// impl<F, X, Y> Function<F, X, Y>
 // where
-//     F: Fn(A) -> B,
+//     F: Fn(X) -> Y,
 // {
-//     pub fn run(&self, a: A) -> B {
+//     pub fn run(&self, a: X) -> Y {
 //         (self.f)(a)
 //     }
 // }
+// 
+// impl<'p, F, X, Y> Profunctor<'p, X, Y> for Function<F, X, Y>
+// where
+//     F: Fn(X) -> Y + 'p,
+//     X: 'p,
+//     Y: 'p,
+// {
+//     type Family = FunctionProfunctorFamily;
+// 
+//     fn dimap<Pre, Post, W, Z>(
+//         self,
+//         pre: Pre,
+//         post: Post,
+//     ) -> <Self::Family as ProfunctorFamily>::Pro<'p, impl Fn(W) -> Z + 'p, W, Z>
+//     where
+//         Pre: Fn(W) -> X + 'p,
+//         Post: Fn(Y) -> Z + 'p,
+//         W: 'p,
+//         Z: 'p,
+//     {
+//         Function::new(move |w| post(self.run(pre(w))))
+//     }
+// }
 
-impl<F, B, C> Profunctor<B, C> for F
-where
-    F: Fn(B) -> C,
-{
-    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
+struct FnProfunctorFamily;
+impl ProfunctorFamily for FnProfunctorFamily {
+    type Pro<'p, F, X, Y>
+        = F
     where
-        Pre: Fn(A) -> B,
-        Post: Fn(C) -> D,
+        F: Fn(X) -> Y + 'p,
+        X: 'p,
+        Y: 'p;
+}
+
+impl<'p, F, X, Y> Profunctor<'p, X, Y> for F
+where
+    F: Fn(X) -> Y + 'p,
+{
+    type Family = FnProfunctorFamily;
+
+    fn dimap<Pre, Post, W, Z>(
+        self,
+        pre: Pre,
+        post: Post,
+    ) -> <Self::Family as ProfunctorFamily>::Pro<'p, impl Fn(W) -> Z + 'p, W, Z>
+    where
+        Pre: Fn(W) -> X + 'p,
+        Post: Fn(Y) -> Z + 'p,
+        W: 'p,
+        Z: 'p,
     {
-        Dimap::new(pre, self, post)
+        move |w| post(self(pre(w)))
     }
 }
 
@@ -127,24 +188,24 @@ impl<Pre, F, Post, A, B, C, D> Dimap<Pre, F, Post, A, B, C, D> {
     }
 }
 
-impl<Pre, F, Post, A, B, C, D> Profunctor<A, D> for Dimap<Pre, F, Post, A, B, C, D>
-where
-    Pre: Fn(A) -> B,
-    F: Profunctor<B, C>,
-    Post: Fn(C) -> D,
-{
-    fn dimap<OuterPre, OuterPost, X, Y>(
-        self,
-        pre: OuterPre,
-        post: OuterPost,
-    ) -> impl Profunctor<X, Y>
-    where
-        OuterPre: Fn(X) -> A,
-        OuterPost: Fn(D) -> Y,
-    {
-        Dimap::new(pre, self, post)
-    }
-}
+// impl<Pre, F, Post, A, B, C, D> Profunctor<A, D> for Dimap<Pre, F, Post, A, B, C, D>
+// where
+//     Pre: Fn(A) -> B,
+//     F: Profunctor<B, C>,
+//     Post: Fn(C) -> D,
+// {
+//     fn dimap<OuterPre, OuterPost, X, Y>(
+//         self,
+//         pre: OuterPre,
+//         post: OuterPost,
+//     ) -> impl Profunctor<X, Y>
+//     where
+//         OuterPre: Fn(X) -> A,
+//         OuterPost: Fn(D) -> Y,
+//     {
+//         Dimap::new(pre, self, post)
+//     }
+// }
 
 trait Optic<C, R, U, S, T>: Sized
 where
@@ -152,15 +213,16 @@ where
 {
     fn transform(self, pro: impl Profunctor<S, T>) -> impl Profunctor<R, U>;
 
-    // with : (p s t -> p r u) -> (p a b -> p s t) -> (p a b) -> (p r u)
+    // with : (p s t -> p r u) -> (p a b -> p s t) -> (p a b -> p r u)
     // Don't be deceived by the <S, T> in `WithOptic`. It's just phantomdata for the intermediates
-    fn with<Inner, A, B>(self, inner: Inner) -> WithOptic<Self, Inner, S, T> {
-        WithOptic {
-            outer: self,
-            inner,
-            s: Default::default(),
-            t: Default::default(),
-        }
+    fn with<Inner, InnerClass, A, B>(
+        self,
+        inner: Inner,
+    ) -> WithOptic<C::With<InnerClass>, Self, Inner, S, T>
+    where
+        InnerClass: OpticClass,
+    {
+        WithOptic::new(self, inner)
     }
 }
 
@@ -196,12 +258,24 @@ where
 //
 // }
 
-struct WithOptic<Outer, Inner, S, T> {
-    // kind: PhantomData<Kind>,
+struct WithOptic<C, Outer, Inner, S, T> {
+    kind: PhantomData<C>,
     outer: Outer,
     inner: Inner,
     s: PhantomData<S>,
     t: PhantomData<T>,
+}
+
+impl<C, Outer, Inner, S, T> WithOptic<C, Outer, Inner, S, T> {
+    pub fn new(outer: Outer, inner: Inner) -> Self {
+        Self {
+            kind: Default::default(),
+            outer,
+            inner,
+            s: Default::default(),
+            t: Default::default(),
+        }
+    }
 }
 
 // ==== Introduction ====

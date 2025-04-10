@@ -1,9 +1,9 @@
-mod animals;
 mod concrete_impl;
 mod families;
 mod hkt;
 mod kind_in_generics;
 mod profunctor;
+mod testing;
 
 use crate::concrete_impl::Lens;
 use std::marker::PhantomData;
