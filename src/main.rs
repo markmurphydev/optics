@@ -1,9 +1,9 @@
 mod animals;
-mod choose_optic;
 mod concrete_impl;
 mod families;
 mod hkt;
 mod kind_in_generics;
+mod profunctor;
 
 use crate::concrete_impl::Lens;
 use std::marker::PhantomData;
