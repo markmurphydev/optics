@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 
 trait Profunctor<B, C> {
-    type F;
-    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> Dimap<Pre, Self::F, Post, A, B, C, D>
+    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
     where
         Pre: Fn(A) -> B,
         Post: Fn(C) -> D;
@@ -17,16 +16,14 @@ impl<F, B, C> Profunctor<B, C> for F
 where
     F: FnProfunctor<B, C>,
 {
-    type F = fn(&F, B) -> C;
-
-    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> Dimap<Pre, Self::F, Post, A, B, C, D>
+    fn dimap<Pre, Post, A, D>(self, pre: Pre, post: Post) -> impl Profunctor<A, D>
     where
         Pre: Fn(A) -> B,
         Post: Fn(C) -> D,
     {
         Dimap {
             pre,
-            f: Self::run,
+            f: self,
             post,
             a: PhantomData,
             b: PhantomData,
@@ -36,7 +33,12 @@ where
     }
 }
 
-struct Dimap<Pre, F, Post, A, B, C, D> {
+struct Dimap<Pre, F, Post, A, B, C, D>
+where
+    Pre: Fn(A) -> B,
+    F: FnProfunctor<B, C>,
+    Post: Fn(C) -> D,
+{
     pre: Pre,
     f: F,
     post: Post,
@@ -118,6 +120,7 @@ mod test {
             }
         }
 
-        let b = Add2.dimap(add1, add3);
+        let add6 = Add2.dimap(add1, add3);
+        println!("add6: {}", add6.run(0))
     }
 }
