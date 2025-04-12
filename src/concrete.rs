@@ -1,156 +1,116 @@
+// ==== Class Hierarchy ====
+// For calculating least upper bound of two optics kinds
+
+use crate::with::{IsoWithIso, LensWithLens};
 use std::marker::PhantomData;
 
-trait OpticKind {
-    type With<Rhs: OpticKind>;
-    type WithIso;
-    type WithLens;
-    type WithOptic;
-}
-
-impl OpticKind for IsIso {
-    type With<Rhs: OpticKind> = Rhs::WithIso;
-    type WithIso = IsIso;
-    type WithLens = IsLens;
-    type WithOptic = IsOptic;
-}
-
-impl OpticKind for IsLens {
-    type With<Rhs: OpticKind> = Rhs::WithLens;
-    type WithIso = IsLens;
-    type WithLens = IsLens;
-    type WithOptic = IsOptic;
-}
-
-impl OpticKind for IsOptic {
-    type With<Rhs: OpticKind> = Rhs::WithOptic;
-    type WithIso = IsOptic;
-    type WithLens = IsOptic;
-    type WithOptic = IsOptic;
-}
-
-struct IsIso;
-struct IsLens;
 struct IsOptic;
+struct IsLens;
+struct IsPrism;
+struct IsAdapter;
 
-// TODO -- Are the trait bounds needed?
-// TODO -- Multiple inheritance (Lens / Prism) -> Traverse/Optic
-pub trait Iso<R, U, S, T>
-where
-    R: Clone,
-    U: Clone,
-    S: Clone,
-    T: Clone,
-{
-    type OpticKind: OpticKind;
-    fn view(&self, left: &R) -> S;
-    fn review(&self, right: &T) -> U;
+trait OpticClass {
+    type With<Rhs: OpticClass>;
+    type WithOptic;
+    type WithLens;
+    type WithPrism;
+    type WithAdapter;
 }
 
-impl<I, R, U, S, T> Lens<R, U, S, T> for I
-where
-    I: Iso<R, U, S, T>,
-    R: Clone,
-    U: Clone,
-    S: Clone,
-    T: Clone,
-{
-    type OpticKind = <I as Iso<R, U, S, T>>::OpticKind;
-
-    fn view(&self, structure: &R) -> S {
-        self.view(structure)
-    }
-
-    // We can recover the entire structure from `new_focus`,
-    // so we can discard `old_structure`
-    fn update(self, new_focus: T, _old_structure: &R) -> U {
-        self.review(&new_focus)
-    }
+impl OpticClass for IsOptic {
+    type With<Rhs: OpticClass> = Rhs::WithOptic;
+    type WithOptic = IsOptic;
+    type WithLens = IsOptic;
+    type WithPrism = IsOptic;
+    type WithAdapter = IsOptic;
 }
 
-pub trait Lens<R, U, S, T>
-where
-    R: Clone,
-    U: Clone,
-    S: Clone,
-    T: Clone,
-{
-    type OpticKind: OpticKind;
-
-    fn view(&self, structure: &R) -> S;
-    fn update(self, new_focus: T, old_structure: &R) -> U;
+impl OpticClass for IsLens {
+    type With<Rhs: OpticClass> = Rhs::WithLens;
+    type WithOptic = IsOptic;
+    type WithLens = IsLens;
+    type WithPrism = IsOptic;
+    type WithAdapter = IsLens;
 }
 
-impl<L, R, U, S, T> Optic<R, U, S, T> for L
-where
-    L: Iso<R, U, S, T>,
-    R: Clone,
-    U: Clone,
-    S: Clone,
-    T: Clone,
-{
-    type OpticKind = <L as Lens<R, U, S, T>>::OpticKind;
+impl OpticClass for IsPrism {
+    type With<Rhs: OpticClass> = Rhs::WithPrism;
+    type WithOptic = IsOptic;
+    type WithLens = IsOptic;
+    type WithPrism = IsPrism;
+    type WithAdapter = IsPrism;
 }
 
-pub trait Optic<R, U, S, T>: Sized {
-    type OpticKind: OpticKind;
+impl OpticClass for IsAdapter {
+    type With<Rhs: OpticClass> = Rhs::WithAdapter;
+    type WithOptic = IsOptic;
+    type WithLens = IsLens;
+    type WithPrism = IsPrism;
+    type WithAdapter = IsAdapter;
+}
 
-    fn with<Inner, A, B>(
-        self,
-        inner: Inner,
-    ) -> Composed<Self, Inner, <Self::OpticKind as OpticKind>::With<Inner::OpticKind>>
+// ==== Traits ====
+
+// TODO -- If you want composition to work correctly, we need to descend in structure
+//  Hense, <R, U, S, T, A, B>
+//  REEEE
+pub trait Lens<A, B, S, T> {
+    fn view(&self, structure: &S) -> A;
+    fn update(&self, new_focus: B, old_structure: &S) -> T;
+
+    fn with_lens<L, X, Y>(self, lens: L) -> impl Lens<A, B, X, Y>
     where
-        Inner: Optic<S, T, A, B>,
-        A: Clone,
-        B: Clone,
+        Self: Sized,
+        L: Lens<S, T, X, Y>,
     {
-        Composed {
-            outer: self,
-            inner,
-            composed_kind: PhantomData,
+        LensWithLens::new(self, lens)
+    }
+}
+
+pub trait Iso<A, B, S, T> {
+    fn view(&self, original: &S) -> A;
+    fn review(&self, transformed: &B) -> T;
+
+    fn with_iso<I, X, Y>(self, iso: I) -> impl Iso<A, B, X, Y>
+    where
+        Self: Sized,
+        I: Iso<S, T, X, Y>,
+    {
+        IsoWithIso::new(self, iso)
+    }
+}
+
+// ==== Implementations ====
+// struct ConcreteLens<A, B, S, T, View, Update> {
+//
+// }
+
+struct ConcreteIso<A, B, S, T, View, Review> {
+    v: View,
+    r: Review,
+    _t: PhantomData<(A, B, S, T)>,
+}
+
+impl<A, B, S, T, View, Review> ConcreteIso<A, B, S, T, View, Review> {
+    pub fn new(v: View, r: Review) -> Self {
+        Self {
+            v,
+            r,
+            _t: Default::default(),
         }
     }
 }
 
-pub struct Composed<Outer, Inner, ComposedKind> {
-    outer: Outer,
-    inner: Inner,
-    composed_kind: PhantomData<ComposedKind>,
+impl<A, B, S, T, View, Review> Iso<S, T, A, B> for ConcreteIso<A, B, S, T, View, Review>
+where
+    View: Fn(&A) -> S,
+    Review: Fn(&T) -> B,
+{
+    fn view(&self, left: &A) -> S {
+        (self.v)(left)
+    }
+
+    fn review(&self, right: &T) -> B {
+        (self.r)(right)
+    }
 }
-
-// impl<Outer, Inner, R, U, S, T, A, B> Iso<R, U, A, B> for Composed<Outer, Inner, S, T>
-// where
-//     Outer: Iso<R, U, S, T>,
-//     Inner: Iso<S, T, A, B>,
-//     R: Clone,
-//     U: Clone,
-//     S: Clone,
-//     T: Clone,
-//     A: Clone,
-//     B: Clone,
-// {
-//     type OpticKind = ();
-//
-//     fn view(&self, left: &R) -> A {
-//         todo!()
-//     }
-//
-//     fn review(&self, right: &B) -> U {
-//         todo!()
-//     }
-// }
-
-// impl<Outer, Inner, R, U, S, T, A, B> Lens<R, U, A, B> for Composed<Outer, Inner, S, T>
-// where
-//     Outer: Lens<R, U, S, T>,
-//     Inner: Lens<S, T, A, B>,
-// {
-//     fn view<'a>(&'a self, structure: &'a R) -> &'a A {
-//         self.inner.view(self.outer.view(structure))
-//     }
-//
-//     fn update(self, new_focus: B, old_structure: &R) -> U {
-//         let old_inner = self.outer.view(old_structure);
-//         let new_inner = self.inner.update(new_focus, old_inner);
-//         self.outer.update(new_inner, old_structure)
-//     }
-// }
