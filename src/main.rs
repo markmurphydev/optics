@@ -1,10 +1,11 @@
-mod concrete_impl;
+mod concrete;
 mod families;
 mod hkt;
 mod kind_in_generics;
 mod optic;
 mod profunctor;
 mod testing;
+mod util;
 
 fn main() {
     let ship_1 = Ship {
@@ -38,7 +39,7 @@ pub struct Ship {
 
 pub mod ship {
     use crate::Ship;
-    use crate::concrete_impl::*;
+    use crate::concrete::*;
 
     // pub struct Captain;
     // impl Lens<Ship, Ship, String, String> for Captain {
@@ -62,7 +63,7 @@ pub struct Armada {
 }
 
 pub mod armada {
-    use crate::concrete_impl::*;
+    use crate::concrete::*;
     use crate::{Armada, Ship};
 
     pub struct Ship1;
