@@ -1,20 +1,27 @@
-struct Wrapper<F>(F);
-impl<'a, F> Wrapper<F>
-where
-    F: Fn() + 'a,
-{
-    fn run(&self) {
-        self.0()
-    }
-
-    fn new_wrapper(&self) -> Wrapper<impl Fn()> {
-        Wrapper(|| {
-            println!("New");
-            self.0()
-        })
+trait One<A> {
+    fn print_one(&self) {
+        println!("ONE")
     }
 }
 
-fn return_wrapper() -> Wrapper<impl Fn()> {
-    Wrapper(|| println!("Wrapped!"))
+impl<F, A> One<A> for F where F: Fn(A) -> A {}
+
+trait Two<A, B> {
+    fn print_two(&self) {
+        println!("TWO")
+    }
+}
+
+impl<F, A, B> Two<A, B> for F where F: Fn(A) -> B {}
+
+fn id<A>(a: A) -> A {
+    a
+}
+
+fn return_one<A>() -> impl One<A> {
+    id
+}
+
+fn return_two<A>() -> impl Two<A, A> {
+    id
 }
