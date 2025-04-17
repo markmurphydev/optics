@@ -1,3 +1,5 @@
+#![feature(impl_trait_in_assoc_type)]
+
 use crate::concrete::Lens;
 
 mod concrete;
@@ -7,6 +9,7 @@ mod profunctor;
 mod testing;
 mod util;
 mod with;
+mod no_fn;
 
 fn main() {
     let ship_1 = Ship {
@@ -25,10 +28,10 @@ fn main() {
     };
 
     let armada = Armada { ship_1, ship_2 };
-
-    let ship_1_captain = armada::Ship1.with_lens(ship::Captain);
-    dbg!(ship_1_captain.view(&armada));
-    dbg!(ship_1_captain.update("Kristen".to_string(), &armada));
+    //
+    // let ship_1_captain = armada::Ship1.with_lens(ship::Captain);
+    // dbg!(ship_1_captain.view(&armada));
+    // dbg!(ship_1_captain.update("Kristen".to_string(), &armada));
 }
 
 // ==== Example ====
